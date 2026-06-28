@@ -25,7 +25,11 @@ DEFAULT_TOPICS    = ["ai", "llm", "cli", "devtools", "open source", "security",
 HN_STORY_COUNT    = 15
 HN_SHOW_COUNT     = 8
 GH_SHOW_COUNT     = 8
-BREACH_SHOW_COUNT = 12  # breach/hack news items to show
+BREACH_SHOW_COUNT = 12
+SO_TAGS           = ["python", "javascript", "docker", "bash", "linux"]
+SO_SHOW_COUNT     = 8
+COMMITS_SHOW      = 10
+COMMITS_REPOS     = 8   # how many recently-pushed repos to scan
 
 BREACH_SOURCES = [
     ("The Hacker News",   "https://feeds.feedburner.com/TheHackersNews"),
@@ -211,6 +215,77 @@ def print_breach(items):
         print(f"      {DIM}{source}  ·  {dt}{RESET}")
         print(f"      {DIM}{item['link'][:80]}{RESET}")
 
+# ── Stack Overflow Hot Questions ─────────────────────────────────────────────
+
+def get_so_questions(tags=SO_TAGS, show=SO_SHOW_COUNT):
+    print(f"{DIM}  fetching Stack Overflow...{RESET}", end="\r")
+    tag_str = ";".join(tags[:5])
+    data = fetch_json(
+        f"https://api.stackexchange.com/2.3/questions"
+        f"?order=desc&sort=hot&tagged={tag_str}&site=stackoverflow&pagesize={show}"
+    )
+    if not data:
+        return []
+    return data.get("items", [])[:show]
+
+def print_so(questions):
+    ORANGE = "\033[33m"
+    print(f"\n{BOLD}{ORANGE}◆ Stack Overflow — Hot Questions{RESET}")
+    print(f"{DIM}  {'─'*62}{RESET}")
+    for i, q in enumerate(questions, 1):
+        title   = q.get("title", "untitled")
+        score   = q.get("score", 0)
+        answers = q.get("answer_count", 0)
+        tags    = ", ".join(q.get("tags", [])[:4])
+        print(f"\n  {BOLD}{i:>2}. {title}{RESET}")
+        print(f"      {DIM}▲ {score}  ·  {answers} answers  ·  {tags}{RESET}")
+
+# ── Recent Commits ────────────────────────────────────────────────────────────
+
+def get_recent_commits(show=COMMITS_SHOW):
+    print(f"{DIM}  fetching recent commits...{RESET}", end="\r")
+    try:
+        who = subprocess.run(["gh", "api", "user", "-q", ".login"],
+                             capture_output=True, text=True, timeout=5)
+        account = who.stdout.strip() or "?"
+        r = subprocess.run(
+            ["gh", "api", "/user/repos?per_page=20&sort=pushed"],
+            capture_output=True, text=True, timeout=10
+        )
+        if r.returncode != 0:
+            return [], account
+        repos = json.loads(r.stdout or "[]")
+        commits = []
+        for repo in repos[:COMMITS_REPOS]:
+            full_name = repo["full_name"]
+            cr = subprocess.run(
+                ["gh", "api", f"/repos/{full_name}/commits?per_page=3"],
+                capture_output=True, text=True, timeout=8
+            )
+            if cr.returncode != 0:
+                continue
+            for c in json.loads(cr.stdout or "[]"):
+                msg  = c.get("commit", {}).get("message", "").split("\n")[0][:100]
+                dt   = c.get("commit", {}).get("committer", {}).get("date", "")
+                sha  = (c.get("sha") or "")[:7]
+                url  = c.get("html_url", f"https://github.com/{full_name}")
+                commits.append({"sha": sha, "msg": msg, "date": dt, "repo": full_name, "url": url})
+        commits.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return commits[:show], account
+    except Exception:
+        return [], "?"
+
+def print_commits(commits, account):
+    print(f"\n{BOLD}{MAGENTA}◆ Recent Commits — {account}{RESET}")
+    print(f"{DIM}  {'─'*62}{RESET}")
+    if not commits:
+        print(f"\n  {DIM}No commits found.{RESET}")
+        return
+    for i, c in enumerate(commits, 1):
+        dt = c["date"][:10] if c["date"] else "?"
+        print(f"\n  {BOLD}{i:>2}. {c['msg']}{RESET}")
+        print(f"      {DIM}{c['repo']}  ·  {c['sha']}  ·  {dt}{RESET}")
+
 # ── GitHub Notifications ──────────────────────────────────────────────────────
 
 def get_gh_notifications():
@@ -287,7 +362,7 @@ def print_docker(containers):
 
 # ── HTML page ─────────────────────────────────────────────────────────────────
 
-def build_html(today_str, stories, repos, breach_items, notifications, gh_account, containers):
+def build_html(today_str, stories, repos, breach_items, notifications, gh_account, containers, so_questions, commits, commits_account):
     def hn_cards(stories):
         out = []
         for s in stories:
@@ -323,6 +398,53 @@ def build_html(today_str, stories, repos, breach_items, notifications, gh_accoun
               <div class="meta">
                 <span>{source}</span>
                 <span class="breach-date">📅 {dt}</span>
+              </div>
+            </div>""")
+        return "\n".join(out)
+
+    def so_cards(questions):
+        if not questions:
+            return '<div class="card"><div class="desc">No questions fetched.</div></div>'
+        out = []
+        for q in questions:
+            title   = html_mod.escape(q.get("title", "untitled"))
+            link    = html_mod.escape(q.get("link", "#"))
+            score   = q.get("score", 0)
+            answers = q.get("answer_count", 0)
+            tags    = " ".join(
+                f'<span class="lang-badge">{html_mod.escape(t)}</span>'
+                for t in q.get("tags", [])[:4]
+            )
+            answered = q.get("is_answered", False)
+            ans_cls  = "answered" if answered else ""
+            out.append(f"""
+            <div class="card">
+              <a class="title" href="{link}" target="_blank">{title}</a>
+              <div class="meta">
+                <span>▲ {score}</span>
+                <span class="{ans_cls}">{answers} answer{'s' if answers != 1 else ''}</span>
+                {tags}
+              </div>
+            </div>""")
+        return "\n".join(out)
+
+    def commit_cards(commits, account):
+        if not commits:
+            return '<div class="card"><div class="desc">No commits found.</div></div>'
+        out = []
+        for c in commits:
+            msg  = html_mod.escape(c["msg"] or "(no message)")
+            repo = html_mod.escape(c["repo"])
+            sha  = html_mod.escape(c["sha"])
+            dt   = c["date"][:10] if c["date"] else "?"
+            url  = html_mod.escape(c["url"])
+            out.append(f"""
+            <div class="card">
+              <a class="title" href="{url}" target="_blank">{msg}</a>
+              <div class="meta">
+                <span class="repo-name">{repo}</span>
+                <span class="sha-badge">{sha}</span>
+                <span>{dt}</span>
               </div>
             </div>""")
         return "\n".join(out)
@@ -441,6 +563,10 @@ def build_html(today_str, stories, repos, breach_items, notifications, gh_accoun
   .status-dot {{ width: 8px; height: 8px; border-radius: 50%; display:inline-block; flex-shrink:0; }}
   .dot-up {{ background: var(--green); box-shadow: 0 0 4px var(--green); }}
   .dot-down {{ background: #f85149; }}
+  .answered {{ color: var(--green); }}
+  .repo-name {{ color: var(--green); font-family: ui-monospace, monospace; font-size: .78rem; }}
+  .sha-badge {{ background: #21262d; border: 1px solid var(--border); border-radius: 4px;
+                padding: .05rem .4rem; font-family: ui-monospace, monospace; font-size: .75rem; color: var(--orange); }}
   .refresh-btn {{
     display: inline-flex; align-items: center; gap: .4rem;
     background: none; border: 1px solid var(--border); border-radius: 6px;
@@ -483,6 +609,16 @@ def build_html(today_str, stories, repos, breach_items, notifications, gh_accoun
   <section>
     <h2>🔴 Security Breaches &amp; Hacks</h2>
     {breach_cards(breach_items)}
+  </section>
+
+  <section>
+    <h2>Stack Overflow — Hot Questions</h2>
+    {so_cards(so_questions)}
+  </section>
+
+  <section>
+    <h2>Recent Commits — {html_mod.escape(commits_account)}</h2>
+    {commit_cards(commits, commits_account)}
   </section>
 
   <section>
@@ -557,6 +693,7 @@ def main():
 
     stories, repos, breach_items = [], [], []
     notifications, gh_account, containers = [], "?", []
+    so_questions, commits, commits_account = [], [], "?"
 
     if not args.no_hn:
         stories = get_hn_stories(topics)
@@ -575,6 +712,16 @@ def main():
     if breach_items:
         print_breach(breach_items)
 
+    so_questions = get_so_questions()
+    print(" " * 50, end="\r")
+    if so_questions:
+        print_so(so_questions)
+
+    commits, commits_account = get_recent_commits()
+    print(" " * 50, end="\r")
+    if commits:
+        print_commits(commits, commits_account)
+
     notifications, gh_account = get_gh_notifications()
     print(" " * 50, end="\r")
     if notifications:
@@ -592,7 +739,8 @@ def main():
     if not args.no_browser and (stories or repos or breach_items):
         page = Path.home() / ".devpulse" / "devpulse.html"
         page.write_text(build_html(today_str, stories, repos, breach_items,
-                                   notifications, gh_account, containers))
+                                   notifications, gh_account, containers,
+                                   so_questions, commits, commits_account))
         open_browser("http://localhost:8080/devpulse.html")
 
 if __name__ == "__main__":

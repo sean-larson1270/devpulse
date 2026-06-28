@@ -22,6 +22,13 @@
     color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
   }
   #date { text-align: center; color: var(--muted); font-size: .95rem; margin-top: .4rem; }
+  #weather {
+    margin-top: .6rem; font-size: .82rem; color: var(--muted);
+    display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: center;
+  }
+  #weather .temp { font-size: 1.1rem; font-weight: 500; color: var(--text); }
+  #weather .pill { background: var(--surface); border: 1px solid var(--border);
+                   border-radius: 10px; padding: .15rem .6rem; font-size: .76rem; }
 
   .hero {
     margin: 2.5rem 0 2rem;
@@ -76,6 +83,18 @@
 
   .empty { padding: .75rem .5rem; font-size: .82rem; color: var(--muted); }
 
+  /* sticky notes */
+  .notes-widget { max-width: 680px; width: 100%; margin-bottom: 1.25rem; }
+  .notes-widget textarea {
+    width: 100%; min-height: 90px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: ui-monospace, monospace; font-size: .85rem;
+    padding: .75rem 1rem; resize: vertical; outline: none;
+    transition: border-color .15s;
+  }
+  .notes-widget textarea:focus { border-color: var(--accent); }
+  .notes-widget textarea::placeholder { color: var(--border); }
+
   .section-label {
     max-width: 680px; width: 100%;
     font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
@@ -104,6 +123,7 @@
 
 <div id="clock">00:00:00</div>
 <div id="date"></div>
+<div id="weather"></div>
 
 <a class="hero" href="/devpulse.html">
   <div class="hero-icon">⚡</div>
@@ -174,6 +194,11 @@
 
 <div id="streak"></div>
 
+<div class="section-label" style="margin-top:1.5rem;">scratch pad</div>
+<div class="notes-widget">
+  <textarea id="notes" placeholder="Notes, thoughts, todos… saved automatically"></textarea>
+</div>
+
 <script>
   function pad(n) { return String(n).padStart(2, '0'); }
   function tick() {
@@ -203,6 +228,18 @@
     try {
       const res  = await fetch('http://localhost:8081/api/status');
       const data = await res.json();
+
+      // Weather
+      const w = data.weather || {};
+      if (w.temp_f) {
+        document.getElementById('weather').innerHTML = `
+          <span class="temp">${w.temp_f}°F</span>
+          <span>${esc(w.desc)}</span>
+          <span class="pill">Feels ${w.feels_f}°F</span>
+          <span class="pill">↑${w.high_f}° ↓${w.low_f}°</span>
+          <span class="pill">💧${w.humidity}%</span>
+          <span class="pill">💨 ${w.wind_mph}mph ${esc(w.wind_dir)}</span>`;
+      }
 
       // GitHub notifications
       document.getElementById('gh-account').textContent = data.gh_account || '';
@@ -249,7 +286,12 @@
   }
 
   loadStatus();
-  setInterval(loadStatus, 30000); // refresh widgets every 30s
+  setInterval(loadStatus, 30000);
+
+  // Sticky notes — auto-save to localStorage
+  const notes = document.getElementById('notes');
+  notes.value = localStorage.getItem('devpulse-notes') || '';
+  notes.addEventListener('input', () => localStorage.setItem('devpulse-notes', notes.value));
 </script>
 </body>
 </html>
