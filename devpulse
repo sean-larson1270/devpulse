@@ -211,9 +211,83 @@ def print_breach(items):
         print(f"      {DIM}{source}  ·  {dt}{RESET}")
         print(f"      {DIM}{item['link'][:80]}{RESET}")
 
+# ── GitHub Notifications ──────────────────────────────────────────────────────
+
+def get_gh_notifications():
+    print(f"{DIM}  fetching GitHub notifications...{RESET}", end="\r")
+    try:
+        r = subprocess.run(
+            ["gh", "api", "notifications", "--paginate"],
+            capture_output=True, text=True, timeout=10
+        )
+        if r.returncode != 0:
+            return [], "unknown"
+        items = json.loads(r.stdout or "[]")
+        # get active account name
+        who = subprocess.run(["gh", "api", "user", "-q", ".login"],
+                             capture_output=True, text=True, timeout=5)
+        account = who.stdout.strip() or "?"
+        out = []
+        for n in items:
+            subj = n.get("subject", {})
+            repo = n.get("repository", {}).get("full_name", "")
+            out.append({
+                "title":  subj.get("title", ""),
+                "type":   subj.get("type", ""),
+                "repo":   repo,
+                "url":    f"https://github.com/{repo}",
+                "unread": n.get("unread", False),
+                "date":   n.get("updated_at", ""),
+            })
+        out.sort(key=lambda x: x["date"], reverse=True)
+        return out[:15], account
+    except Exception:
+        return [], "?"
+
+def print_gh_notifications(items, account):
+    BLUE = "\033[34m"
+    print(f"\n{BOLD}{BLUE}◆ GitHub Notifications ({account}){RESET}")
+    print(f"{DIM}  {'─'*62}{RESET}")
+    if not items:
+        print(f"\n  {DIM}No notifications.{RESET}")
+        return
+    for i, n in enumerate(items, 1):
+        dot = "●" if n["unread"] else "○"
+        dt  = n["date"][:10] if n["date"] else "?"
+        print(f"\n  {BOLD}{i:>2}. {dot} {n['title']}{RESET}")
+        print(f"      {DIM}{n['repo']}  ·  {n['type']}  ·  {dt}{RESET}")
+
+# ── Docker Status ─────────────────────────────────────────────────────────────
+
+def get_docker_status():
+    print(f"{DIM}  fetching Docker status...{RESET}", end="\r")
+    try:
+        r = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{json .}}"],
+            capture_output=True, text=True, timeout=8
+        )
+        containers = [json.loads(l) for l in r.stdout.strip().splitlines() if l]
+        return containers
+    except Exception:
+        return []
+
+def print_docker(containers):
+    print(f"\n{BOLD}{CYAN}◆ Docker Containers{RESET}")
+    print(f"{DIM}  {'─'*62}{RESET}")
+    if not containers:
+        print(f"\n  {DIM}No containers found.{RESET}")
+        return
+    for c in containers:
+        name   = c.get("Names", "?")
+        status = c.get("Status", "?")
+        ports  = c.get("Ports", "")
+        icon   = GREEN if "Up" in status else "\033[31m"
+        print(f"\n  {BOLD}{icon}■{RESET} {BOLD}{name}{RESET}")
+        print(f"      {DIM}{status}  {('· ' + ports[:60]) if ports else ''}{RESET}")
+
 # ── HTML page ─────────────────────────────────────────────────────────────────
 
-def build_html(today_str, stories, repos, breach_items):
+def build_html(today_str, stories, repos, breach_items, notifications, gh_account, containers):
     def hn_cards(stories):
         out = []
         for s in stories:
@@ -249,6 +323,54 @@ def build_html(today_str, stories, repos, breach_items):
               <div class="meta">
                 <span>{source}</span>
                 <span class="breach-date">📅 {dt}</span>
+              </div>
+            </div>""")
+        return "\n".join(out)
+
+    def notification_cards(items, account):
+        if not items:
+            return '<div class="card"><div class="desc">No notifications.</div></div>'
+        out = []
+        for n in items:
+            title  = html_mod.escape(n["title"])
+            repo   = html_mod.escape(n["repo"])
+            ntype  = html_mod.escape(n["type"])
+            url    = html_mod.escape(n["url"])
+            dt     = n["date"][:10] if n["date"] else "?"
+            dot    = "●" if n["unread"] else "○"
+            cls    = " unread" if n["unread"] else ""
+            out.append(f"""
+            <div class="card{cls}">
+              <a class="title" href="{url}" target="_blank">{dot} {title}</a>
+              <div class="meta">
+                <span>{repo}</span>
+                <span class="lang-badge">{ntype}</span>
+                <span>{dt}</span>
+              </div>
+            </div>""")
+        return "\n".join(out)
+
+    def docker_cards(containers):
+        if not containers:
+            return '<div class="card"><div class="desc">No containers found.</div></div>'
+        out = []
+        for c in containers:
+            name   = html_mod.escape(c.get("Names", "?"))
+            status = html_mod.escape(c.get("Status", "?"))
+            ports  = html_mod.escape(c.get("Ports", ""))
+            image  = html_mod.escape(c.get("Image", ""))
+            up     = "Up" in c.get("Status", "")
+            dot_cls = "dot-up" if up else "dot-down"
+            out.append(f"""
+            <div class="card">
+              <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.35rem;">
+                <span class="status-dot {dot_cls}"></span>
+                <span class="title" style="display:inline;">{name}</span>
+              </div>
+              <div class="meta">
+                <span>{status}</span>
+                <span>{image}</span>
+                {f'<span>{ports[:60]}</span>' if ports else ''}
               </div>
             </div>""")
         return "\n".join(out)
@@ -315,6 +437,10 @@ def build_html(today_str, stories, repos, breach_items):
             padding-top: 1rem; margin-top: 1rem; }}
   .breach-card {{ border-left: 3px solid #f85149; }}
   .breach-date {{ color: #f85149; }}
+  .unread {{ border-left: 3px solid var(--accent); }}
+  .status-dot {{ width: 8px; height: 8px; border-radius: 50%; display:inline-block; flex-shrink:0; }}
+  .dot-up {{ background: var(--green); box-shadow: 0 0 4px var(--green); }}
+  .dot-down {{ background: #f85149; }}
   .refresh-btn {{
     display: inline-flex; align-items: center; gap: .4rem;
     background: none; border: 1px solid var(--border); border-radius: 6px;
@@ -357,6 +483,16 @@ def build_html(today_str, stories, repos, breach_items):
   <section>
     <h2>🔴 Security Breaches &amp; Hacks</h2>
     {breach_cards(breach_items)}
+  </section>
+
+  <section>
+    <h2>GitHub Notifications — {html_mod.escape(gh_account)}</h2>
+    {notification_cards(notifications, gh_account)}
+  </section>
+
+  <section>
+    <h2>Docker Containers</h2>
+    {docker_cards(containers)}
   </section>
 
   <footer>Generated by devpulse · <code>devpulse --help</code> to customize</footer>
@@ -420,6 +556,7 @@ def main():
     print(f"{BOLD}{MAGENTA}{'━'*66}{RESET}")
 
     stories, repos, breach_items = [], [], []
+    notifications, gh_account, containers = [], "?", []
 
     if not args.no_hn:
         stories = get_hn_stories(topics)
@@ -438,13 +575,24 @@ def main():
     if breach_items:
         print_breach(breach_items)
 
+    notifications, gh_account = get_gh_notifications()
+    print(" " * 50, end="\r")
+    if notifications:
+        print_gh_notifications(notifications, gh_account)
+
+    containers = get_docker_status()
+    print(" " * 50, end="\r")
+    if containers:
+        print_docker(containers)
+
     print(f"\n{DIM}{'─'*66}")
     print(f"  Customize: devpulse --lang go,rust --topics security,wasm")
     print(f"  Terminal only: devpulse --no-browser{RESET}\n")
 
     if not args.no_browser and (stories or repos or breach_items):
         page = Path.home() / ".devpulse" / "devpulse.html"
-        page.write_text(build_html(today_str, stories, repos, breach_items))
+        page.write_text(build_html(today_str, stories, repos, breach_items,
+                                   notifications, gh_account, containers))
         open_browser("http://localhost:8080/devpulse.html")
 
 if __name__ == "__main__":

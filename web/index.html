@@ -13,28 +13,22 @@
   body {
     background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; padding: 2rem 1rem;
+    display: flex; flex-direction: column;
+    align-items: center; padding: 2.5rem 1rem 3rem;
   }
 
-  /* ── clock ── */
   #clock {
     font-size: 5rem; font-weight: 200; letter-spacing: -2px;
-    color: var(--text); font-variant-numeric: tabular-nums;
-    line-height: 1;
+    color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
   }
-  #date {
-    text-align: center; color: var(--muted); font-size: .95rem;
-    margin-top: .4rem; letter-spacing: .5px;
-  }
+  #date { text-align: center; color: var(--muted); font-size: .95rem; margin-top: .4rem; }
 
-  /* ── devpulse hero ── */
   .hero {
     margin: 2.5rem 0 2rem;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 1.5rem 2rem;
     display: flex; align-items: center; gap: 1.5rem;
-    max-width: 480px; width: 100%;
+    max-width: 680px; width: 100%;
     text-decoration: none; color: inherit;
     transition: border-color .15s, transform .1s;
   }
@@ -43,10 +37,53 @@
   .hero-text h2 { font-size: 1.2rem; color: var(--accent); }
   .hero-text p  { font-size: .85rem; color: var(--muted); margin-top: .3rem; line-height: 1.5; }
 
-  /* ── quick links ── */
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; max-width: 680px; width: 100%; margin-bottom: 1.25rem; }
+
+  .widget { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .widget-header {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); padding: .65rem 1rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .widget-header .account { font-size: .7rem; color: var(--accent); text-transform: none; letter-spacing: 0; }
+  .widget-body { padding: .5rem; max-height: 260px; overflow-y: auto; }
+  .widget-body::-webkit-scrollbar { width: 4px; }
+  .widget-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .n-item {
+    display: flex; align-items: flex-start; gap: .5rem;
+    padding: .45rem .5rem; border-radius: 6px; text-decoration: none;
+    color: var(--text); transition: background .1s;
+  }
+  .n-item:hover { background: #21262d; }
+  .n-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .n-dot.unread { background: var(--accent); }
+  .n-dot.read   { background: var(--border); }
+  .n-text { flex: 1; min-width: 0; }
+  .n-title { font-size: .82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-meta  { font-size: .72rem; color: var(--muted); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-badge { font-size: .65rem; background: #21262d; border: 1px solid var(--border);
+             border-radius: 10px; padding: .05rem .4rem; color: var(--purple); flex-shrink: 0; margin-top: 3px; }
+
+  .c-item { display: flex; align-items: center; gap: .6rem; padding: .45rem .5rem; border-radius: 6px; }
+  .c-item:hover { background: #21262d; }
+  .c-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .c-dot.up   { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .c-dot.down { background: var(--red); }
+  .c-text { flex: 1; min-width: 0; }
+  .c-name   { font-size: .82rem; font-weight: 500; font-family: ui-monospace, monospace; }
+  .c-status { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .empty { padding: .75rem .5rem; font-size: .82rem; color: var(--muted); }
+
+  .section-label {
+    max-width: 680px; width: 100%;
+    font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); margin-bottom: .5rem;
+  }
   .links-grid {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: .6rem; max-width: 480px; width: 100%;
+    gap: .6rem; max-width: 680px; width: 100%;
   }
   .link-card {
     background: var(--surface); border: 1px solid var(--border);
@@ -59,17 +96,7 @@
   .link-card .lc-label { font-size: .85rem; font-weight: 600; }
   .link-card .lc-desc  { font-size: .72rem; color: var(--muted); }
 
-  /* ── section label ── */
-  .section-label {
-    max-width: 480px; width: 100%;
-    font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
-    color: var(--muted); margin-bottom: .5rem;
-  }
-
-  /* ── streak ── */
-  #streak {
-    margin-top: 2rem; color: var(--muted); font-size: .8rem; text-align: center;
-  }
+  #streak { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
   #streak span { color: var(--orange); font-weight: 600; }
 </style>
 </head>
@@ -85,6 +112,25 @@
     <p>Today's dev digest — HN top stories, GitHub trending, and latest security breaches.</p>
   </div>
 </a>
+
+<!-- live widgets -->
+<div class="row">
+  <div class="widget">
+    <div class="widget-header">
+      GitHub Notifications
+      <span class="account" id="gh-account"></span>
+    </div>
+    <div class="widget-body" id="notifications-body">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-header">Docker Containers</div>
+    <div class="widget-body" id="docker-body">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+</div>
 
 <div class="section-label">quick links</div>
 <div class="links-grid">
@@ -130,35 +176,80 @@
 
 <script>
   function pad(n) { return String(n).padStart(2, '0'); }
-
   function tick() {
     const now = new Date();
     document.getElementById('clock').textContent =
       `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const months = ['January','February','March','April','May','June',
-                    'July','August','September','October','November','December'];
+    const days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     document.getElementById('date').textContent =
       `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()} ${now.getFullYear()}`;
   }
-  tick();
-  setInterval(tick, 1000);
+  tick(); setInterval(tick, 1000);
 
-  // devpulse streak — counts consecutive days the stamp file was refreshed
-  // we infer from last-modified of devpulse.html
+  // devpulse freshness
   fetch('/devpulse.html', { method: 'HEAD' }).then(r => {
     const lm = r.headers.get('Last-Modified');
     if (!lm) return;
-    const last = new Date(lm);
-    const today = new Date();
-    const diffDays = Math.floor((today - last) / 86400000);
+    const diffDays = Math.floor((new Date() - new Date(lm)) / 86400000);
     const el = document.getElementById('streak');
-    if (diffDays === 0) {
-      el.innerHTML = `devpulse last ran <span>today</span> ✓`;
-    } else {
-      el.innerHTML = `devpulse last ran <span>${diffDays}d ago</span> — open a terminal to refresh`;
-    }
+    el.innerHTML = diffDays === 0
+      ? `devpulse last ran <span>today</span> ✓`
+      : `devpulse last ran <span>${diffDays}d ago</span> — open a terminal to refresh`;
   });
+
+  // live status widgets — calls devpulse-server, no external tokens
+  async function loadStatus() {
+    try {
+      const res  = await fetch('http://localhost:8081/api/status');
+      const data = await res.json();
+
+      // GitHub notifications
+      document.getElementById('gh-account').textContent = data.gh_account || '';
+      const nb = document.getElementById('notifications-body');
+      if (!data.notifications.length) {
+        nb.innerHTML = '<div class="empty">No notifications.</div>';
+      } else {
+        nb.innerHTML = data.notifications.slice(0, 15).map(n => `
+          <a class="n-item" href="${n.url}" target="_blank">
+            <span class="n-dot ${n.unread ? 'unread' : 'read'}"></span>
+            <div class="n-text">
+              <div class="n-title">${esc(n.title)}</div>
+              <div class="n-meta">${esc(n.repo)} · ${esc(n.date.slice(0,10))}</div>
+            </div>
+            <span class="n-badge">${esc(n.type)}</span>
+          </a>`).join('');
+      }
+
+      // Docker containers
+      const db = document.getElementById('docker-body');
+      if (!data.containers.length) {
+        db.innerHTML = '<div class="empty">No containers.</div>';
+      } else {
+        db.innerHTML = data.containers.map(c => {
+          const up = c.Status && c.Status.startsWith('Up');
+          return `
+          <div class="c-item">
+            <span class="c-dot ${up ? 'up' : 'down'}"></span>
+            <div class="c-text">
+              <div class="c-name">${esc(c.Names)}</div>
+              <div class="c-status">${esc(c.Status)}${c.Ports ? ' · ' + esc(c.Ports.slice(0,40)) : ''}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    } catch(e) {
+      document.getElementById('notifications-body').innerHTML = '<div class="empty">devpulse-server offline</div>';
+      document.getElementById('docker-body').innerHTML = '<div class="empty">devpulse-server offline</div>';
+    }
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  loadStatus();
+  setInterval(loadStatus, 30000); // refresh widgets every 30s
 </script>
 </body>
 </html>
