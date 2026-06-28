@@ -813,12 +813,13 @@ def main():
     print(f"  Customize: devpulse --lang go,rust --topics security,wasm")
     print(f"  Terminal only: devpulse --no-browser{RESET}\n")
 
-    if not args.no_browser and (stories or repos or breach_items):
+    if stories or repos or breach_items:
         page = Path.home() / ".devpulse" / "devpulse.html"
         page.write_text(build_html(today_str, stories, repos, breach_items,
                                    notifications, gh_account, containers,
                                    so_questions, commits, commits_account, releases))
-        open_browser("http://localhost:8080/devpulse.html")
+        if not args.no_browser:
+            open_browser("http://localhost:8080/devpulse.html")
 
 if __name__ == "__main__":
     main()
