@@ -83,6 +83,36 @@
 
   .empty { padding: .75rem .5rem; font-size: .82rem; color: var(--muted); }
 
+  /* system stats */
+  .stat-bar-wrap { display:flex; align-items:center; gap:.5rem; margin:.3rem 0; font-size:.8rem; }
+  .stat-label { width: 40px; color: var(--muted); flex-shrink:0; }
+  .stat-bar   { flex:1; height:6px; background:#21262d; border-radius:3px; overflow:hidden; }
+  .stat-fill  { height:100%; border-radius:3px; transition: width .4s; }
+  .fill-green  { background: var(--green); }
+  .fill-yellow { background: var(--orange); }
+  .fill-red    { background: var(--red); }
+  .stat-val   { width:60px; text-align:right; color:var(--muted); font-size:.75rem; flex-shrink:0; }
+
+  /* port grid */
+  .port-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:.3rem; padding:.5rem; }
+  .port-item { display:flex; align-items:center; gap:.4rem; padding:.3rem .4rem; border-radius:5px; font-size:.78rem; }
+  .port-item:hover { background:#21262d; }
+  .port-dot  { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .port-up   { background:var(--green); box-shadow:0 0 4px var(--green); }
+  .port-down { background:#21262d; border:1px solid var(--border); }
+  .port-num  { color:var(--accent); font-family:ui-monospace,monospace; width:38px; flex-shrink:0; }
+  .port-lbl  { color:var(--muted); }
+  .port-item.active .port-lbl { color:var(--text); }
+
+  /* tip of the day */
+  .tip-widget { max-width:680px; width:100%; margin-bottom:1.25rem; }
+  .tip-box { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--purple);
+             border-radius:8px; padding:.85rem 1.1rem; }
+  .tip-label { font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--purple); margin-bottom:.4rem; }
+  .tip-text  { font-size:.88rem; line-height:1.6; color:var(--text); }
+  .tip-text code { background:#21262d; border-radius:4px; padding:.1rem .35rem;
+                   font-family:ui-monospace,monospace; font-size:.82rem; color:var(--orange); }
+
   /* sticky notes */
   .notes-widget { max-width: 680px; width: 100%; margin-bottom: 1.25rem; }
   .notes-widget textarea {
@@ -133,7 +163,31 @@
   </div>
 </a>
 
-<!-- live widgets -->
+<!-- tip of the day -->
+<div class="tip-widget">
+  <div class="tip-box">
+    <div class="tip-label">💡 Tip of the Day</div>
+    <div class="tip-text" id="tip-text"></div>
+  </div>
+</div>
+
+<!-- live widgets row 1: system + ports -->
+<div class="row">
+  <div class="widget">
+    <div class="widget-header">System Stats</div>
+    <div class="widget-body" id="system-body" style="padding:.75rem 1rem;">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-header">Dev Ports</div>
+    <div class="port-grid" id="ports-body">
+      <div class="empty" style="grid-column:span 2">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- live widgets row 2: notifications + docker -->
 <div class="row">
   <div class="widget">
     <div class="widget-header">
@@ -223,6 +277,84 @@
       : `devpulse last ran <span>${diffDays}d ago</span> — open a terminal to refresh`;
   });
 
+  // ── Tip of the day ──────────────────────────────────────────────────────────
+  const TIPS = [
+    `Use <code>git stash push -m "name"</code> to stash with a label, then <code>git stash list</code> to see all stashes.`,
+    `<code>ctrl+r</code> in bash reverse-searches your history. Keep pressing to go further back.`,
+    `<code>docker system prune -af</code> removes all stopped containers, unused images, and build cache.`,
+    `<code>git log --oneline --graph --all</code> gives a compact visual branch history.`,
+    `<code>!!:s/old/new</code> repeats the last command with a substitution — handy for typo fixes.`,
+    `<code>git bisect start</code> + <code>git bisect good/bad</code> binary-searches your history to find which commit introduced a bug.`,
+    `<code>python3 -m http.server 8080</code> instantly serves the current directory over HTTP.`,
+    `<code>ss -tlnp</code> shows which processes are listening on which ports — faster than netstat.`,
+    `<code>git commit --fixup HEAD~2</code> + <code>git rebase -i --autosquash</code> cleanly amends older commits.`,
+    `<code>docker stats --no-stream</code> shows a one-shot CPU/memory snapshot of all running containers.`,
+    `<code>cd -</code> jumps back to the previous directory. Toggle between two directories instantly.`,
+    `<code>git diff --stat HEAD~5 HEAD</code> shows a summary of what changed across the last 5 commits.`,
+    `<code>jq '.[0]'</code> on any JSON array gives you the first element — great for inspecting API responses.`,
+    `<code>curl -s url | python3 -m json.tool</code> pretty-prints any JSON from the command line.`,
+    `<code>watch -n 2 docker ps</code> refreshes docker ps every 2 seconds — poor-man's container monitor.`,
+    `<code>git shortlog -sn</code> ranks contributors by commit count.`,
+    `<code>grep -r "pattern" --include="*.py" .</code> limits grep to specific file types.`,
+    `<code>git cherry-pick &lt;sha&gt;</code> applies a single commit from any branch to your current branch.`,
+    `<code>set -euo pipefail</code> at the top of bash scripts: exit on error, treat unset vars as errors, catch pipe failures.`,
+    `<code>docker exec -it &lt;name&gt; sh</code> drops you into a running container shell.`,
+    `<code>git reflog</code> shows every HEAD movement — your safety net after a bad reset or rebase.`,
+    `<code>python3 -c "import this"</code> prints the Zen of Python — worth re-reading occasionally.`,
+    `<code>find . -name "*.log" -mtime +7 -delete</code> removes log files older than 7 days.`,
+    `<code>git tag -a v1.0 -m "Release 1.0"</code> creates an annotated tag — preferred over lightweight tags for releases.`,
+    `<code>lsof -i :3000</code> shows what process is using port 3000.`,
+    `<code>git worktree add ../hotfix hotfix-branch</code> checks out a second branch in a parallel directory without stashing.`,
+    `<code>docker cp &lt;container&gt;:/path/file .</code> copies a file out of a running container without exec.`,
+    `<code>xargs -P 4</code> runs commands in parallel — combine with find for fast bulk operations.`,
+    `<code>git log --follow -- path/to/file</code> tracks a file's history even across renames.`,
+    `<code>python3 -m venv .venv && source .venv/bin/activate</code> — always use a venv, never install globally.`,
+  ];
+  const tip = TIPS[Math.floor(new Date().getDate() % TIPS.length)];
+  document.getElementById('tip-text').innerHTML = tip;
+
+  // ── system stats renderer ─────────────────────────────────────────────────
+  function renderSystem(s) {
+    if (!s || !s.ram_total_gb) {
+      document.getElementById('system-body').innerHTML = '<div class="empty">Unavailable</div>';
+      return;
+    }
+    function barColor(pct) {
+      return pct > 85 ? 'fill-red' : pct > 60 ? 'fill-yellow' : 'fill-green';
+    }
+    document.getElementById('system-body').innerHTML = `
+      <div class="stat-bar-wrap">
+        <span class="stat-label">RAM</span>
+        <div class="stat-bar"><div class="stat-fill ${barColor(s.ram_pct)}" style="width:${s.ram_pct}%"></div></div>
+        <span class="stat-val">${s.ram_used_gb}/${s.ram_total_gb} GB</span>
+      </div>
+      <div class="stat-bar-wrap">
+        <span class="stat-label">Disk</span>
+        <div class="stat-bar"><div class="stat-fill ${barColor(s.disk_pct)}" style="width:${s.disk_pct}%"></div></div>
+        <span class="stat-val">${s.disk_used_gb}/${s.disk_total_gb} GB</span>
+      </div>
+      <div style="margin-top:.6rem;font-size:.78rem;color:var(--muted);">
+        Load avg: <span style="color:var(--text)">${s.load_1}</span> /
+        <span style="color:var(--text)">${s.load_5}</span> /
+        <span style="color:var(--text)">${s.load_15}</span>
+        <span style="margin-left:.5rem;font-size:.72rem;">(1m / 5m / 15m)</span>
+      </div>`;
+  }
+
+  // ── port scanner renderer ─────────────────────────────────────────────────
+  function renderPorts(ports) {
+    if (!ports || !ports.length) {
+      document.getElementById('ports-body').innerHTML = '<div class="empty" style="grid-column:span 2">Unavailable</div>';
+      return;
+    }
+    document.getElementById('ports-body').innerHTML = ports.map(p => `
+      <div class="port-item ${p.up ? 'active' : ''}">
+        <span class="port-dot ${p.up ? 'port-up' : 'port-down'}"></span>
+        <span class="port-num">${p.port}</span>
+        <span class="port-lbl">${esc(p.label)}</span>
+      </div>`).join('');
+  }
+
   // Get browser GPS coords, cache in localStorage
   function getCoords() {
     return new Promise(resolve => {
@@ -250,6 +382,10 @@
       const qs     = coords ? `?lat=${coords.lat}&lon=${coords.lon}` : '';
       const res    = await fetch(`http://localhost:8081/api/status${qs}`);
       const data   = await res.json();
+
+      // System stats + ports
+      renderSystem(data.system);
+      renderPorts(data.ports);
 
       // Weather
       const w = data.weather || {};

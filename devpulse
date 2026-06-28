@@ -29,7 +29,14 @@ BREACH_SHOW_COUNT = 12
 SO_TAGS           = ["python", "javascript", "docker", "bash", "linux"]
 SO_SHOW_COUNT     = 8
 COMMITS_SHOW      = 10
-COMMITS_REPOS     = 8   # how many recently-pushed repos to scan
+COMMITS_REPOS     = 8
+RELEASE_WATCH     = [   # repos to track for new releases — edit this list
+    "docker/compose", "python/cpython", "nodejs/node",
+    "cli/cli", "neovim/neovim", "microsoft/vscode",
+    "kubernetes/kubernetes", "torvalds/linux",
+    "anthropics/claude-code", "golang/go",
+]
+RELEASE_DAYS      = 30  # only show releases within this many days
 
 BREACH_SOURCES = [
     ("The Hacker News",   "https://feeds.feedburner.com/TheHackersNews"),
@@ -286,6 +293,46 @@ def print_commits(commits, account):
         print(f"\n  {BOLD}{i:>2}. {c['msg']}{RESET}")
         print(f"      {DIM}{c['repo']}  ·  {c['sha']}  ·  {dt}{RESET}")
 
+# ── Release Tracker ───────────────────────────────────────────────────────────
+
+def get_releases(repos=RELEASE_WATCH, within_days=RELEASE_DAYS):
+    print(f"{DIM}  fetching releases...{RESET}", end="\r")
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=within_days)
+    results = []
+    for repo in repos:
+        try:
+            r = subprocess.run(
+                ["gh", "api", f"/repos/{repo}/releases/latest"],
+                capture_output=True, text=True, timeout=6
+            )
+            if r.returncode != 0:
+                continue
+            rel  = json.loads(r.stdout)
+            tag  = rel.get("tag_name", "")
+            date = rel.get("published_at", "")
+            url  = rel.get("html_url", f"https://github.com/{repo}/releases")
+            if not date:
+                continue
+            dt = datetime.fromisoformat(date.replace("Z", "+00:00"))
+            if dt < cutoff:
+                continue
+            results.append({"repo": repo, "tag": tag, "date": date[:10], "url": url})
+        except Exception:
+            continue
+    results.sort(key=lambda x: x["date"], reverse=True)
+    return results
+
+def print_releases(items):
+    print(f"\n{BOLD}{CYAN}◆ Recent Releases — Watched Repos{RESET}")
+    print(f"{DIM}  {'─'*62}{RESET}")
+    if not items:
+        print(f"\n  {DIM}No releases in the last {RELEASE_DAYS} days.{RESET}")
+        return
+    for i, r in enumerate(items, 1):
+        print(f"\n  {BOLD}{i:>2}. {r['repo']}  {GREEN}{r['tag']}{RESET}")
+        print(f"      {DIM}{r['date']}  ·  {r['url'][:70]}{RESET}")
+
 # ── GitHub Notifications ──────────────────────────────────────────────────────
 
 def get_gh_notifications():
@@ -362,7 +409,7 @@ def print_docker(containers):
 
 # ── HTML page ─────────────────────────────────────────────────────────────────
 
-def build_html(today_str, stories, repos, breach_items, notifications, gh_account, containers, so_questions, commits, commits_account):
+def build_html(today_str, stories, repos, breach_items, notifications, gh_account, containers, so_questions, commits, commits_account, releases):
     def hn_cards(stories):
         out = []
         for s in stories:
@@ -398,6 +445,25 @@ def build_html(today_str, stories, repos, breach_items, notifications, gh_accoun
               <div class="meta">
                 <span>{source}</span>
                 <span class="breach-date">📅 {dt}</span>
+              </div>
+            </div>""")
+        return "\n".join(out)
+
+    def release_cards(items):
+        if not items:
+            return f'<div class="card"><div class="desc">No releases in the last {RELEASE_DAYS} days.</div></div>'
+        out = []
+        for r in items:
+            repo = html_mod.escape(r["repo"])
+            tag  = html_mod.escape(r["tag"])
+            url  = html_mod.escape(r["url"])
+            dt   = r["date"]
+            out.append(f"""
+            <div class="card">
+              <a class="title repo" href="{url}" target="_blank">{repo}</a>
+              <div class="meta">
+                <span class="sha-badge">{tag}</span>
+                <span>{dt}</span>
               </div>
             </div>""")
         return "\n".join(out)
@@ -612,6 +678,11 @@ def build_html(today_str, stories, repos, breach_items, notifications, gh_accoun
   </section>
 
   <section>
+    <h2>Recent Releases</h2>
+    {release_cards(releases)}
+  </section>
+
+  <section>
     <h2>Stack Overflow — Hot Questions</h2>
     {so_cards(so_questions)}
   </section>
@@ -694,6 +765,7 @@ def main():
     stories, repos, breach_items = [], [], []
     notifications, gh_account, containers = [], "?", []
     so_questions, commits, commits_account = [], [], "?"
+    releases = []
 
     if not args.no_hn:
         stories = get_hn_stories(topics)
@@ -711,6 +783,11 @@ def main():
     print(" " * 50, end="\r")
     if breach_items:
         print_breach(breach_items)
+
+    releases = get_releases()
+    print(" " * 50, end="\r")
+    if releases:
+        print_releases(releases)
 
     so_questions = get_so_questions()
     print(" " * 50, end="\r")
@@ -740,7 +817,7 @@ def main():
         page = Path.home() / ".devpulse" / "devpulse.html"
         page.write_text(build_html(today_str, stories, repos, breach_items,
                                    notifications, gh_account, containers,
-                                   so_questions, commits, commits_account))
+                                   so_questions, commits, commits_account, releases))
         open_browser("http://localhost:8080/devpulse.html")
 
 if __name__ == "__main__":
