@@ -11,32 +11,52 @@ def _cors(handler):
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
-def get_location():
+def reverse_geocode(lat, lon):
+    """Return (city, state) from coordinates using OpenStreetMap Nominatim — no API key."""
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        req = Request(url, headers={"User-Agent": "devpulse/1.0"})
+        with urlopen(req, timeout=5) as r:
+            addr = json.loads(r.read()).get("address", {})
+        city  = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("hamlet") or ""
+        state = addr.get("state", "")
+        return city, state
+    except Exception:
+        return "", ""
+
+def ip_location():
+    """Fallback: coarse location from IP via ip-api.com."""
     try:
         req = Request("http://ip-api.com/json/", headers={"User-Agent": "devpulse/1.0"})
         with urlopen(req, timeout=5) as r:
             d = json.loads(r.read())
         if d.get("status") == "success":
-            return d["lat"], d["lon"], d["city"], d["regionName"]
+            return d["lat"], d["lon"]
     except Exception:
         pass
-    return None, None, None, None
+    return None, None
 
-def get_weather():
+def get_weather(browser_lat=None, browser_lon=None):
     try:
-        lat, lon, city, region = get_location()
-        if lat and lon:
-            location_str = f"{lat},{lon}"
-            location_label = f"{city}, {region}" if city else None
+        if browser_lat and browser_lon:
+            lat, lon = float(browser_lat), float(browser_lon)
+            city, state = reverse_geocode(lat, lon)
         else:
-            location_str = ""
+            lat, lon = ip_location()
+            city, state = ("", "")   # IP city is often wrong — omit it
+
+        if lat and lon:
+            location_str  = f"{lat},{lon}"
+            location_label = f"{city}, {state}".strip(", ") if city else None
+        else:
+            location_str  = ""
             location_label = None
 
-        url = f"https://wttr.in/{location_str}?format=j1"
-        req = Request(url, headers={"User-Agent": "devpulse/1.0"})
+        req = Request(f"https://wttr.in/{location_str}?format=j1",
+                      headers={"User-Agent": "devpulse/1.0"})
         with urlopen(req, timeout=6) as r:
             data = json.loads(r.read())
-        c = data["current_condition"][0]
+        c     = data["current_condition"][0]
         today = data.get("weather", [{}])[0]
         return {
             "temp_f":   c.get("temp_F", "?"),
@@ -52,7 +72,7 @@ def get_weather():
     except Exception:
         return {}
 
-def get_status_data():
+def get_status_data(browser_lat=None, browser_lon=None):
     containers = []
     try:
         r = subprocess.run(["docker", "ps", "-a", "--format", "{{json .}}"],
@@ -85,15 +105,19 @@ def get_status_data():
     except Exception:
         pass
 
-    weather = get_weather()
+    weather = get_weather(browser_lat, browser_lon)
     return {"containers": containers, "notifications": notifications,
             "gh_account": gh_account, "weather": weather}
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/api/status":
-            data = get_status_data()
+        if self.path.startswith("/api/status"):
+            from urllib.parse import urlparse, parse_qs
+            qs   = parse_qs(urlparse(self.path).query)
+            blat = qs.get("lat", [None])[0]
+            blon = qs.get("lon", [None])[0]
+            data = get_status_data(blat, blon)
             body = json.dumps(data).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

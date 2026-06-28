@@ -223,11 +223,33 @@
       : `devpulse last ran <span>${diffDays}d ago</span> — open a terminal to refresh`;
   });
 
+  // Get browser GPS coords, cache in localStorage
+  function getCoords() {
+    return new Promise(resolve => {
+      const cached = localStorage.getItem('devpulse-coords');
+      if (cached) { resolve(JSON.parse(cached)); return; }
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          localStorage.setItem('devpulse-coords', JSON.stringify(coords));
+          // re-cache every 24h
+          setTimeout(() => localStorage.removeItem('devpulse-coords'), 86400000);
+          resolve(coords);
+        },
+        () => resolve(null),
+        { timeout: 5000 }
+      );
+    });
+  }
+
   // live status widgets — calls devpulse-server, no external tokens
   async function loadStatus() {
     try {
-      const res  = await fetch('http://localhost:8081/api/status');
-      const data = await res.json();
+      const coords = await getCoords();
+      const qs     = coords ? `?lat=${coords.lat}&lon=${coords.lon}` : '';
+      const res    = await fetch(`http://localhost:8081/api/status${qs}`);
+      const data   = await res.json();
 
       // Weather
       const w = data.weather || {};
