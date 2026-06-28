@@ -113,17 +113,22 @@
   .tip-text code { background:#21262d; border-radius:4px; padding:.1rem .35rem;
                    font-family:ui-monospace,monospace; font-size:.82rem; color:var(--orange); }
 
-  /* sticky notes */
-  .notes-widget { max-width: 680px; width: 100%; margin-bottom: 1.25rem; }
-  .notes-widget textarea {
-    width: 100%; min-height: 90px; background: var(--surface);
+  /* task list */
+  .tasks-widget { max-width: 680px; width: 100%; margin-bottom: 1.25rem; }
+  .tasks-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+  .tasks-header .section-label { margin:0; }
+  .tasks-saved { font-size:.7rem; color: var(--green); opacity:0; transition: opacity .3s; }
+  .tasks-saved.show { opacity:1; }
+  .tasks-widget textarea {
+    width: 100%; min-height: 130px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 10px;
     color: var(--text); font-family: ui-monospace, monospace; font-size: .85rem;
-    padding: .75rem 1rem; resize: vertical; outline: none;
+    line-height: 1.7; padding: .85rem 1rem; resize: vertical; outline: none;
     transition: border-color .15s;
   }
-  .notes-widget textarea:focus { border-color: var(--accent); }
-  .notes-widget textarea::placeholder { color: var(--border); }
+  .tasks-widget textarea:focus { border-color: var(--accent); }
+  .tasks-widget textarea::placeholder { color: var(--border); }
+  .tasks-hint { font-size:.7rem; color:var(--muted); margin-top:.4rem; }
 
   .section-label {
     max-width: 680px; width: 100%;
@@ -248,9 +253,13 @@
 
 <div id="streak"></div>
 
-<div class="section-label" style="margin-top:1.5rem;">scratch pad</div>
-<div class="notes-widget">
-  <textarea id="notes" placeholder="Notes, thoughts, todos… saved automatically"></textarea>
+<div class="tasks-widget" style="margin-top:1.5rem;">
+  <div class="tasks-header">
+    <div class="section-label">ideas &amp; tasks for claude</div>
+    <span class="tasks-saved" id="tasks-saved">✓ saved</span>
+  </div>
+  <textarea id="tasks" placeholder="- [ ] add dark mode toggle&#10;- [ ] show npm package updates&#10;- [x] add weather widget"></textarea>
+  <div class="tasks-hint">Use <code>- [ ] idea</code> for todos · <code>- [x] done</code> for completed · auto-saves to <code>~/.devpulse/tasks.md</code> so Claude can read it</div>
 </div>
 
 <script>
@@ -447,10 +456,30 @@
   loadStatus();
   setInterval(loadStatus, 30000);
 
-  // Sticky notes — auto-save to localStorage
-  const notes = document.getElementById('notes');
-  notes.value = localStorage.getItem('devpulse-notes') || '';
-  notes.addEventListener('input', () => localStorage.setItem('devpulse-notes', notes.value));
+  // Task list — load from and save to ~/.devpulse/tasks.md via devpulse-server
+  const tasksEl   = document.getElementById('tasks');
+  const savedEl   = document.getElementById('tasks-saved');
+  let saveTimer;
+
+  fetch('http://localhost:8081/tasks')
+    .then(r => r.json())
+    .then(d => { if (d.content) tasksEl.value = d.content; })
+    .catch(() => {});
+
+  tasksEl.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await fetch('http://localhost:8081/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: tasksEl.value })
+        });
+        savedEl.classList.add('show');
+        setTimeout(() => savedEl.classList.remove('show'), 2000);
+      } catch(e) {}
+    }, 600);
+  });
 </script>
 </body>
 </html>
