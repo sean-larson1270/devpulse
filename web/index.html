@@ -235,6 +235,7 @@
         document.getElementById('weather').innerHTML = `
           <span class="temp">${w.temp_f}°F</span>
           <span>${esc(w.desc)}</span>
+          ${w.location ? `<span style="color:var(--accent);font-size:.8rem;">📍 ${esc(w.location)}</span>` : ''}
           <span class="pill">Feels ${w.feels_f}°F</span>
           <span class="pill">↑${w.high_f}° ↓${w.low_f}°</span>
           <span class="pill">💧${w.humidity}%</span>
