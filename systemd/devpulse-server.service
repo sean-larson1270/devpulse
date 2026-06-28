@@ -1,0 +1,11 @@
+[Unit]
+Description=devpulse refresh server
+After=network.target
+
+[Service]
+ExecStart=/home/sean/bin/devpulse-server
+Restart=on-failure
+Environment=PATH=/home/sean/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

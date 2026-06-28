@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sean's dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --orange: #f0883e; --purple: #d2a8ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 2rem 1rem;
+  }
+
+  /* ── clock ── */
+  #clock {
+    font-size: 5rem; font-weight: 200; letter-spacing: -2px;
+    color: var(--text); font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  #date {
+    text-align: center; color: var(--muted); font-size: .95rem;
+    margin-top: .4rem; letter-spacing: .5px;
+  }
+
+  /* ── devpulse hero ── */
+  .hero {
+    margin: 2.5rem 0 2rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem 2rem;
+    display: flex; align-items: center; gap: 1.5rem;
+    max-width: 480px; width: 100%;
+    text-decoration: none; color: inherit;
+    transition: border-color .15s, transform .1s;
+  }
+  .hero:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .hero-icon { font-size: 2.5rem; line-height: 1; }
+  .hero-text h2 { font-size: 1.2rem; color: var(--accent); }
+  .hero-text p  { font-size: .85rem; color: var(--muted); margin-top: .3rem; line-height: 1.5; }
+
+  /* ── quick links ── */
+  .links-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: .6rem; max-width: 480px; width: 100%;
+  }
+  .link-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: .75rem 1rem;
+    text-decoration: none; color: var(--text);
+    display: flex; flex-direction: column; gap: .2rem;
+    transition: border-color .15s;
+  }
+  .link-card:hover { border-color: var(--accent); }
+  .link-card .lc-label { font-size: .85rem; font-weight: 600; }
+  .link-card .lc-desc  { font-size: .72rem; color: var(--muted); }
+
+  /* ── section label ── */
+  .section-label {
+    max-width: 480px; width: 100%;
+    font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); margin-bottom: .5rem;
+  }
+
+  /* ── streak ── */
+  #streak {
+    margin-top: 2rem; color: var(--muted); font-size: .8rem; text-align: center;
+  }
+  #streak span { color: var(--orange); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div id="clock">00:00:00</div>
+<div id="date"></div>
+
+<a class="hero" href="/devpulse.html">
+  <div class="hero-icon">⚡</div>
+  <div class="hero-text">
+    <h2>devpulse</h2>
+    <p>Today's dev digest — HN top stories, GitHub trending, and latest security breaches.</p>
+  </div>
+</a>
+
+<div class="section-label">quick links</div>
+<div class="links-grid">
+  <a class="link-card" href="https://github.com" target="_blank">
+    <span class="lc-label">GitHub</span>
+    <span class="lc-desc">Code &amp; repos</span>
+  </a>
+  <a class="link-card" href="https://news.ycombinator.com" target="_blank">
+    <span class="lc-label">Hacker News</span>
+    <span class="lc-desc">Tech discussion</span>
+  </a>
+  <a class="link-card" href="https://github.com/trending" target="_blank">
+    <span class="lc-label">GH Trending</span>
+    <span class="lc-desc">Hot repos today</span>
+  </a>
+  <a class="link-card" href="https://developer.mozilla.org" target="_blank">
+    <span class="lc-label">MDN</span>
+    <span class="lc-desc">Web docs</span>
+  </a>
+  <a class="link-card" href="https://www.bleepingcomputer.com" target="_blank">
+    <span class="lc-label">BleepingComp</span>
+    <span class="lc-desc">Security news</span>
+  </a>
+  <a class="link-card" href="https://stackoverflow.com" target="_blank">
+    <span class="lc-label">Stack Overflow</span>
+    <span class="lc-desc">Q&amp;A</span>
+  </a>
+  <a class="link-card" href="https://devdocs.io" target="_blank">
+    <span class="lc-label">DevDocs</span>
+    <span class="lc-desc">Unified API docs</span>
+  </a>
+  <a class="link-card" href="https://roadmap.sh" target="_blank">
+    <span class="lc-label">Roadmap.sh</span>
+    <span class="lc-desc">Learning paths</span>
+  </a>
+  <a class="link-card" href="https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=2026" target="_blank">
+    <span class="lc-label">CVE List</span>
+    <span class="lc-desc">Latest vulns</span>
+  </a>
+</div>
+
+<div id="streak"></div>
+
+<script>
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function tick() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    document.getElementById('date').textContent =
+      `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()} ${now.getFullYear()}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // devpulse streak — counts consecutive days the stamp file was refreshed
+  // we infer from last-modified of devpulse.html
+  fetch('/devpulse.html', { method: 'HEAD' }).then(r => {
+    const lm = r.headers.get('Last-Modified');
+    if (!lm) return;
+    const last = new Date(lm);
+    const today = new Date();
+    const diffDays = Math.floor((today - last) / 86400000);
+    const el = document.getElementById('streak');
+    if (diffDays === 0) {
+      el.innerHTML = `devpulse last ran <span>today</span> ✓`;
+    } else {
+      el.innerHTML = `devpulse last ran <span>${diffDays}d ago</span> — open a terminal to refresh`;
+    }
+  });
+</script>
+</body>
+</html>
